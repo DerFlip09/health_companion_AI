@@ -20,3 +20,4 @@ def get_session():
  
 # dependency for database session and to use in the API endpoints
 db_depend = Annotated[Session, Depends(get_session)]
+
