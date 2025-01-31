@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship, ARRAY, JSON, Column, Enum as PgEnum
-from pydantic import EmailStr, BaseModel, field_validator
+from pydantic import EmailStr, field_validator
 from datetime import datetime, date
 from typing import Optional, List, Any, Dict
 from enum import Enum
@@ -63,12 +63,13 @@ class User(SQLModel, table=True):
 
 
 class UserPlan(SQLModel, table=True):
-    user_id: int = Field(primary_key=True, foreign_key="users.id", index=True)
+    id: int = Field(primary_key=True, index=True, default=None)
+    user_id: int = Field(foreign_key="users.id", index=True)
     plan: Plan = Field(sa_column=Column(PgEnum(Plan)))
     details: Dict[str, Any] = Field(sa_column=Column(JSON)) 
-    created_at: date = Field(default_factory=date.today)
-    runtime: int = Field()
+    runtime: int = Field(default=7)
     active: bool = Field(default=False)
+    created_at: date = Field(default_factory=date.today)
 
     @field_validator("runtime")
     def validate_runtime(cls, value):

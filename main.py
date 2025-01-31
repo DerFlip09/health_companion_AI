@@ -2,7 +2,7 @@ from database import db_depend
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from models import User, UserResponse, UserInfo, UserPlan
+from models import User, UserResponse, UserInfo, UserPlan, Plan
 from datamanager import Datamanager
 
 dataman = Datamanager()
@@ -22,7 +22,7 @@ async def create_user(user: User, db: db_depend):
     result = dataman.create_user(user, db)
     if result.success:
         return JSONResponse(status_code=200, content={"detail": result.message})
-
+    
 
 @app.post("/user/user_info/{user_id}", response_model=UserResponse)
 async def add_user_info(user_id: int, user_info_data: UserInfo, db: db_depend):
@@ -32,6 +32,7 @@ async def add_user_info(user_id: int, user_info_data: UserInfo, db: db_depend):
         return JSONResponse(status_code=200, content={"detail": result.message})
     if result.error == "Not Found":
         raise HTTPException(status_code=404, detail=result.message)
+    
 
 @app.put("/user/update/{user_id}", response_model=UserResponse)
 async def update_user(user_id: int, db: db_depend, user_data: Optional[User], user_info_data: Optional[UserInfo]) -> UserResponse:
@@ -46,6 +47,7 @@ async def update_user(user_id: int, db: db_depend, user_data: Optional[User], us
         return JSONResponse(status_code=200, content={"detail": result.message})
     if result.error == "Not Found":     
         raise HTTPException(status_code=404, detail=result.message)
+    
 
 @app.delete("/user/delete/{user_id}", response_model=UserResponse)
 async def delete_user(user_id: int, db: db_depend):
@@ -57,5 +59,9 @@ async def delete_user(user_id: int, db: db_depend):
 
 
 @app.post("/plan/")
-async def create_plan(plan: UserPlan):
-    return plan
+async def create_plan(user_id: int, plan: Plan, runtime: int, db: db_depend):
+    result = dataman.create_user_plan(user_id, db, plan, runtime)
+    if result.success:
+        return JSONResponse(status_code=200, content={"detail": result.message})
+    if result.error == "Not Found":     
+        raise HTTPException(status_code=404, detail=result.message)
