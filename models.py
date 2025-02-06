@@ -12,6 +12,7 @@ class Sex(Enum):
 class Plan(Enum):
     TRAINING = "TRAINING"
     MEAL = "MEAL"
+    ALL = "ALL"
 
 
 class TrainingPreferences(Enum):

@@ -65,3 +65,14 @@ async def create_plan(user_id: int, plan: Plan, runtime: int, db: db_depend):
         return JSONResponse(status_code=200, content={"detail": result.message})
     if result.error == "Not Found":     
         raise HTTPException(status_code=404, detail=result.message)
+
+
+@app.get("/user/{user_id}/plans/")
+async def get_active_user_plan(user_id: int, db: db_depend, plan: Plan):
+    result = dataman.get_active_user_plan(user_id, db, plan)
+    print(result)
+    print(type(result))
+    if result is None:
+        raise HTTPException(status_code=404, detail="User not found or no active plan!")
+    else:
+        return result

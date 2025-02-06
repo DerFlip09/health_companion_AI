@@ -1,6 +1,6 @@
 import dotenv
 import database
-from sqlmodel import Session
+from sqlmodel import Session, select
 from pydantic import BaseModel
 from openai import OpenAI
 from models import User, UserInfo, UserPlan, Plan
@@ -75,15 +75,13 @@ class Datamanager():
         if not user:
             return Result(success=False, message=f"User {user_id} not found", error="Not Found")
         
-        updates = {
-            user: user_data,
-            user.user_info: user_info_data
-        }
+        if user_data:
+            for key, value in user_data.items():
+                setattr(user, key, value)
 
-        for target, data in updates.items():
-            if data:
-                for key, value in data.items():
-                    setattr(target, key, value)
+        if user_info_data and user.user_info:
+            for key, value in user_info_data.items():
+                setattr(user.user_info, key, value)
         
         result = self.update_database(user, db)
         if result.success:
@@ -110,12 +108,16 @@ class Datamanager():
             if result.success:
                 return Result(success=True, message=f"User plan for User {user_id} successfully created")
 
-    def get_user_plan(self, user_id: int, db: Session):
-        user = self.get_user(user_id, db)
-        if not user:
-            return Result(success=False, message=f"User {user_id} not found", error="Not Found")
-        
-        user_plan = db.query(User)
+    def get_active_user_plan(self, user_id: int, db: Session, plan: Plan):        
+        if plan.value == "ALL":
+            user_plans = db.exec(select(UserPlan).where(UserPlan.user_id == user_id, UserPlan.active == True).limit(2))
+            return None if dict(user_plans) == {} else user_plans
+        else:
+            user_plan = db.exec(select(UserPlan).where(UserPlan.user_id == user_id, UserPlan.active == True, UserPlan.plan == plan))
+            return None if dict(user_plan) else user_plan
+    
+    def update_user_plan_active_status(self, user_id: int, db: Session, plan_id: int):
+        pass
 
     def update_database(self, item: User | UserInfo | UserPlan, db: Session, delete=False):
         if delete:
@@ -150,7 +152,6 @@ class Datamanager():
 
     # TODO: make a PDF document for the PLan
     # TODO: get and activate/deactivate function
-    # TODO: update user Error resolve
     # TODO: fieldvalidator error find the problem
-    # TODO: a function that calculates the price of each plan (printing it on the PDF)
+    # TODO: a function that calculates the price of each plan (printing it on the PDF
 
