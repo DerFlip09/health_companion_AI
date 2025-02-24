@@ -1,7 +1,7 @@
 from database import db_depend
 from typing import Optional
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from models import User, UserResponse, UserInfo, UserPlan, Plan
 from datamanager import Datamanager
 
@@ -70,9 +70,28 @@ async def create_plan(user_id: int, plan: Plan, runtime: int, db: db_depend):
 @app.get("/user/{user_id}/plans/")
 async def get_active_user_plan(user_id: int, db: db_depend, plan: Plan):
     result = dataman.get_active_user_plan(user_id, db, plan)
-    print(result)
-    print(type(result))
     if result is None:
         raise HTTPException(status_code=404, detail="User not found or no active plan!")
     else:
         return result
+
+@app.put("/user/{user_id}/plans/{plan_id}/")
+async def update_plan_status(plan_id: int, db: db_depend):
+    result = dataman.change_plan_status(db, plan_id)
+    if result.success:
+        return JSONResponse(status_code=200, content={"detail": result.message})
+    if result.error == "Not Found":     
+        raise HTTPException(status_code=404, detail=result.message)
+    
+@app.get("/user/{user_id}/plans/export_plan/")
+async def export_plan(user_id: int, db: db_depend, plan: Plan):
+    user_plan = dataman.get_active_user_plan(user_id, db, plan)
+    if not user_plan:
+        raise HTTPException(status_code=404, detail="No active plan found for this user")
+
+    pdf_data = dataman.generate_plan_pdf(user_plan)
+    
+    headers = {
+        'Content-Disposition': 'attachment; filename="plan.pdf"'
+    }
+    return StreamingResponse(pdf_data, media_type="application/pdf", headers=headers)

@@ -1,5 +1,8 @@
 import dotenv
 import database
+import json
+from io import BytesIO
+from fpdf import FPDF
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from openai import OpenAI
@@ -103,21 +106,28 @@ class Datamanager():
         
         created_plan = self.make_request(user, plan, runtime)
         if created_plan:
-            user_plan = UserPlan(user_id=user_id, plan=plan, details=created_plan.model_dump(), runtime=runtime)
-            result = self.update_database(user_plan, db)
+            plan = UserPlan(user_id=user_id, plan=plan, details=created_plan.model_dump(), runtime=runtime)
+            result = self.update_database(plan, db)
             if result.success:
                 return Result(success=True, message=f"User plan for User {user_id} successfully created")
 
     def get_active_user_plan(self, user_id: int, db: Session, plan: Plan):        
         if plan.value == "ALL":
             user_plans = db.exec(select(UserPlan).where(UserPlan.user_id == user_id, UserPlan.active == True).limit(2))
-            return None if dict(user_plans) == {} else user_plans
+            user_plans = user_plans.all()
+            return None if user_plans is None else user_plans
         else:
             user_plan = db.exec(select(UserPlan).where(UserPlan.user_id == user_id, UserPlan.active == True, UserPlan.plan == plan))
-            return None if dict(user_plan) else user_plan
+            user_plan = user_plan.one_or_none()
+            return None if user_plan is None else user_plan
     
-    def update_user_plan_active_status(self, user_id: int, db: Session, plan_id: int):
-        pass
+    def change_plan_status(self, db: Session, plan_id: int):
+        plan = db.get(UserPlan, plan_id)
+        if not plan:
+            return Result(success=False, message=f"User plan {plan_id} not found", error="Not Found")
+        plan.active = not plan.active
+        self.update_database(plan, db)
+        return Result(success=True, message=f"User plan status for plan {plan_id} successfully changed")
 
     def update_database(self, item: User | UserInfo | UserPlan, db: Session, delete=False):
         if delete:
@@ -149,9 +159,51 @@ class Datamanager():
 
         plan = completion.choices[0].message.parsed
         return plan
+    
+    def generate_plan_pdf(self, plan: UserPlan) -> BytesIO:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
 
-    # TODO: make a PDF document for the PLan
-    # TODO: get and activate/deactivate function
+        pdf.cell(200, 10, txt=f"User ID: {plan.user_id}", ln=True, align="C")
+        pdf.cell(200, 10, txt=f"Plan Type: {plan.plan.value}", ln=True, align="C")
+        pdf.cell(200, 10, txt=f"Runtime: {plan.runtime} days", ln=True, align="C")
+        pdf.ln(10)
+
+        details = plan.details  
+        
+        if plan.plan.value == "TRAINING":
+            training_plan = TrainingPlan(**details)
+            pdf.cell(200, 10, txt="Training Plan Details:", ln=True)
+            pdf.ln(5)
+
+            for day in training_plan.days:
+                pdf.cell(200, 10, txt=f"Day: {day.day}", ln=True)
+                for exercise in day.exercises:
+                    pdf.cell(200, 10, txt=f"  - {exercise.name}: {exercise.sets} sets x {exercise.repetitions} reps", ln=True)
+                    pdf.cell(200, 10, txt=f"    {exercise.description}", ln=True)
+                pdf.ln(5)
+
+        elif plan.plan.value == "NUTRITION":
+            nutrition_plan = NutritionPlan(**details)
+            pdf.cell(200, 10, txt="Nutrition Plan Details:", ln=True)
+            pdf.ln(5)
+
+            for day in nutrition_plan.days:
+                pdf.cell(200, 10, txt=f"Day: {day.day}", ln=True)
+                for meal in day.meals:
+                    pdf.cell(200, 10, txt=f"  - {meal.name}: {meal.calories} kcal", ln=True)
+                    pdf.cell(200, 10, txt=f"    Protein: {meal.protein}g, Fats: {meal.fats}g, Carbs: {meal.carbohydrates}g", ln=True)
+                    pdf.cell(200, 10, txt=f"    Ingredients: {', '.join(meal.ingredients)}", ln=True)
+                    pdf.cell(200, 10, txt=f"    Instructions: {meal.instructions}", ln=True)
+                pdf.ln(5)
+
+        pdf_output = BytesIO()
+        pdf.output(pdf_output)
+        pdf_output.seek(0)
+        return pdf_output
+
+
     # TODO: fieldvalidator error find the problem
     # TODO: a function that calculates the price of each plan (printing it on the PDF
 
