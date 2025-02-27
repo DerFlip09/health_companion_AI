@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field, Relationship, ARRAY, JSON, Column, Enum as PgEnum
+from sqlmodel import SQLModel, Field, Relationship, ARRAY, JSON, Column, ForeignKey, Enum as PgEnum
 from pydantic import EmailStr, field_validator
 from datetime import datetime, date
 from typing import Optional, List, Any, Dict
@@ -65,7 +65,7 @@ class User(SQLModel, table=True):
 
 class UserPlan(SQLModel, table=True):
     id: int = Field(primary_key=True, index=True, default=None)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: int = Field(sa_column=Column(ForeignKey("users.id", ondelete="CASCADE"), index=True))
     plan: Plan = Field(sa_column=Column(PgEnum(Plan)))
     details: Dict[str, Any] = Field(sa_column=Column(JSON)) 
     runtime: int = Field(default=7)
